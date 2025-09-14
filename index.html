@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <title>Buddy Board – 14 Buddy + 4 Obstacles (18 Tiles)</title>
+  <style>
+    :root{ --bg1:#14213d;--bg2:#0b1022;--tileA:#2ec4ff;--tileB:#7bf1a8;--tileC:#ffd166;--tileD:#ff6b6b; --accent:#ffd54a;--text:#fff;--muted:#d6e2ff;--shadow:rgba(0,0,0,.35); }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:linear-gradient(180deg,var(--bg1),var(--bg2));color:var(--text);font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Arial;overflow:hidden}
+
+    .wrap{height:100%;display:grid;grid-template-columns:380px 1fr 320px;gap:16px;padding:16px}
+    .panel{background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.15);border-radius:16px;padding:14px;backdrop-filter:blur(6px);box-shadow:0 10px 30px var(--shadow);overflow:auto}
+    .title{margin:0 0 10px;color:var(--accent);font-weight:900;letter-spacing:.12em;text-transform:uppercase;font-size:13px}
+
+    textarea{width:100%;background:#0f1346;color:var(--text);border:1px solid rgba(255,213,74,.35);border-radius:12px;padding:10px;resize:vertical;min-height:100px}
+    textarea::placeholder{color:#b7c4ff}
+    .controls{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;align-items:center}
+    button{background:#111a3b;color:#ffd54a;border:1px solid rgba(255,213,74,.6);padding:8px 14px;border-radius:12px;cursor:pointer;font-weight:800;text-transform:uppercase;letter-spacing:.06em;transition:transform .06s ease, box-shadow .25s ease}
+    button:hover{box-shadow:0 0 22px rgba(255,213,74,.35)}
+    button:active{transform:translateY(1px) scale(.99)}
+    .btn-accent{background:linear-gradient(180deg,#ffd54a,#ffb703);color:#1a1400;border-color:#ffc107}
+    .btn-danger{background:#ff6b6b;color:#fff;border-color:#ff9aa7}
+    .btn-muted{background:#243057;color:#d6e2ff;border-color:#42508a}
+    .tag{display:inline-block;padding:4px 8px;border:1px dashed rgba(255,213,74,.45);border-radius:999px;color:#d6e2ff;font-size:12px}
+    label.switch{display:flex;align-items:center;gap:8px;font-size:12px;color:#d6e2ff}
+    label.switch input{accent-color:#ffd54a}
+
+    .boardwrap{position:relative;display:grid;grid-template-rows:auto 1fr auto;gap:10px;height:100%}
+    .scene{position:relative;border:1px solid rgba(255,255,255,.18);border-radius:18px;overflow:hidden;min-height:520px;background:linear-gradient(180deg,#0b132b,#0b1022)}
+    .scene-inner{position:absolute;inset:0;display:grid;place-items:center}
+
+    .grid{position:relative;display:grid;grid-template-columns:repeat(6,1fr);grid-auto-rows:1fr;gap:12px;padding:16px}
+    .tile{position:relative;display:grid;place-items:center;height:110px;border-radius:14px;background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.18);box-shadow:0 10px 30px var(--shadow)}
+    .tile.buddy{color:#0b1022;background:linear-gradient(180deg,var(--tileA),#a5f3ff)}
+    .tile.obstacle{background:linear-gradient(180deg,#2b2e54,#191c3d);color:#fff;border-style:dashed}
+    .label{position:absolute;top:6px;left:8px;font-weight:900;color:rgba(0,0,0,.55);}
+    .name{font-weight:900;text-align:center;padding:8px}
+    .badge{position:absolute;right:8px;bottom:6px;background:rgba(0,0,0,.6);color:#fff;padding:2px 6px;border-radius:8px;font-size:11px}
+    .tile.active{outline:3px solid #fff;box-shadow:0 0 0 4px rgba(255,255,255,.85),0 0 30px #fff}
+    .tile.used .name{text-decoration:line-through;opacity:0.6}
+
+    /* blink for remaining buddies */
+    @keyframes softBlink{0%{box-shadow:0 0 0 0 rgba(255,213,74,.0)}100%{box-shadow:0 0 22px 6px rgba(255,213,74,.35)}}
+    .tile.buddy.blink:not(.used){animation:softBlink 1.2s ease-in-out infinite alternate}
+
+    .dice{position:absolute;right:16px;top:16px;display:flex}
+    .cube-dice{position:relative;width:64px;height:64px;display:grid;place-items:center;border-radius:10px;background:#fff;color:#111;font-weight:900;margin-left:8px;transition:transform 1s ease}
+
+    .winner{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.18);padding:8px 14px;border-radius:999px;font-weight:900;letter-spacing:.06em}
+
+    .roster{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px}
+    .roster button{background:#1d2a5a;color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:10px;padding:10px;font-weight:800;cursor:pointer}
+    .roster button:disabled{opacity:.5}
+
+    #currentPlayer{margin-top:10px;font-size:1.2em;font-weight:bold;color:#ffd54a}
+
+    details{margin-top:10px}
+    .test-pass{color:#7df9a7}
+    .test-fail{color:#ff9aa7}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <section class="panel">
+    <h3 class="title">BUDDY LIST (14)</h3>
+    <textarea id="names" placeholder="รายชื่อ Buddy (บรรทัดละ 1) สูงสุด 14"></textarea>
+    <div class="controls">
+      <button id="btnLoad" class="btn-accent">โหลดรายชื่อ</button>
+      <button id="btnRoll" class="btn-accent">ทอยลูกเต๋า</button>
+      <button id="btnReset" class="btn-danger">รีเซ็ต</button>
+      <span class="tag" id="countTag">0 รายชื่อ</span>
+    </div>
+    <div class="roster" id="roster"></div>
+
+    <hr>
+    <h3 class="title">ผู้เล่นตานี้</h3>
+    <textarea id="playersThisRound" placeholder="รายชื่อผู้เล่น (บรรทัดละ 1)"></textarea>
+    <div class="controls">
+      <button id="btnPickPlayer" class="btn-accent">สุ่มผู้เล่นตานี้</button>
+      <span class="tag" id="playersLeft">-</span>
+    </div>
+    <div id="currentPlayer">ผู้เล่นตานี้คือ: — 🎮</div>
+
+    <hr>
+    <h3 class="title">Obstacle (4 ปุ่มสุ่มตำแหน่ง)</h3>
+    <div class="controls">
+      <button id="btnObsShuffle" class="btn-muted">สุ่มตำแหน่งอุปสรรค</button>
+      <button id="btnObsKinds" class="btn-muted">สุ่มชนิด</button>
+      <button id="btnObsClear" class="btn-danger">ลบอุปสรรค</button>
+      <span class="tag" id="obsCount">0 อุปสรรค</span>
+    </div>
+    <label class="switch"><input type="checkbox" id="autoReshuffle"> สุ่มอุปสรรคใหม่ทุกครั้งที่ทอย</label>
+
+    <details>
+      <summary>Dev Tests</summary>
+      <div id="testResults"></div>
+    </details>
+  </section>
+
+  <section class="panel boardwrap">
+    <div class="scene" id="scene">
+      <div class="scene-inner">
+        <div class="grid" id="grid"></div>
+      </div>
+      <div class="dice">
+        <div class="cube-dice" id="dice1"><span class="p">1</span></div>
+        <div class="cube-dice" id="dice2"><span class="p">1</span></div>
+      </div>
+      <div class="winner" id="winner">Buddy ของคุณคือ… — (ผู้เล่น: —)</div>
+    </div>
+  </section>
+
+  <aside class="panel">
+    <h3 class="title">BUDDY SUMMARY</h3>
+    <div id="summary" class="history"></div>
+  </aside>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+const namesEl=$('#names'), countTag=$('#countTag');
+const rosterEl=$('#roster');
+const btnLoad=$('#btnLoad'), btnRoll=$('#btnRoll'), btnReset=$('#btnReset');
+const gridEl=$('#grid');
+const dice1=$('#dice1'), dice2=$('#dice2');
+const winnerEl=$('#winner');
+const playersEl=$('#playersThisRound'), btnPickPlayer=$('#btnPickPlayer'), currentEl=$('#currentPlayer'), playersLeft=$('#playersLeft');
+const btnObsShuffle=$('#btnObsShuffle'), btnObsKinds=$('#btnObsKinds'), btnObsClear=$('#btnObsClear'), obsCount=$('#obsCount');
+const autoReshuffle=$('#autoReshuffle');
+const testResults=$('#testResults');
+const summaryEl=$('#summary');
+
+const TOTAL=18; const BUDDY_SLOTS=14; const OB_COUNT=4;
+let pos=0; let tiles=[]; // {type:'buddy'|'ob'|'empty', name?, effect?}
+let names=[], roster=[]; let slotToBuddy=[]; // name or null when used
+let obstacleIdxs=[];
+let playersThisRound=[], currentPlayer=null;
+let pairs=[]; // {player, buddy}
+let rolling=false;
+
+function beep(freq=880,duration=0.2){const ctx=new (window.AudioContext||window.webkitAudioContext)();const o=ctx.createOscillator();const g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.frequency.value=freq;o.type='sine';g.gain.value=0.1;o.start();o.stop(ctx.currentTime+duration)}
+
+function normalizeList(input){const seen=new Set();const out=[];for(const raw of input){const n=(raw||'').trim();if(!n||seen.has(n)) continue;seen.add(n);out.push(n);if(out.length===14)break;}return out;}
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a}
+function randomObstacleKind(){const kinds=['forward','back','teleport'];const k=kinds[Math.floor(Math.random()*3)];if(k==='teleport'){let to=Math.floor(Math.random()*TOTAL)+1;return {type:'teleport',to}} else {return {type:k,value:Math.floor(Math.random()*3)+1}}}
+
+function blinkOn(){[...gridEl.children].forEach((c,i)=>{if(tiles[i]?.type==='buddy' && slotToBuddy[i]) c.classList.add('blink')})}
+function blinkOff(){[...gridEl.children].forEach(c=>c.classList.remove('blink'))}
+
+function renderBoard(){
+  gridEl.innerHTML='';
+  tiles.forEach((t,idx)=>{
+    const d=document.createElement('div'); d.className='tile';
+    const label=document.createElement('div'); label.className='label'; label.textContent=idx+1; d.appendChild(label);
+    if(t.type==='buddy'){
+      d.classList.add('buddy'); if(!slotToBuddy[idx]) d.classList.add('used');
+      const n=document.createElement('div'); n.className='name'; n.textContent=t.name||''; d.appendChild(n);
+    } else if(t.type==='ob'){
+      d.classList.add('obstacle'); const n=document.createElement('div'); n.className='name'; n.textContent='OBSTACLE'; d.appendChild(n);
+      const b=document.createElement('div'); b.className='badge'; const ef=t.effect; let txt=''; let tip='';
+      if(ef.type==='forward'){txt='＋'+ef.value; tip=`เดินหน้า ${ef.value}`} else if(ef.type==='back'){txt='−'+ef.value; tip=`ถอยหลัง ${ef.value}`} else {txt='↯'; tip=`เทเลพอร์ตไปช่อง ${ef.to}`} b.textContent=txt; b.title=tip; d.appendChild(b);
+    }
+    if(idx===pos) d.classList.add('active');
+    gridEl.appendChild(d);
+  });
+  obsCount.textContent = `${obstacleIdxs.length} อุปสรรค`;
+  if(currentPlayer && !rolling) blinkOn();
+}
+
+function toggleActive(){[...gridEl.children].forEach((c,i)=>c.classList.toggle('active',i===pos));}
+
+function chooseObstaclePositionsPreserveBuddy(){
+  const empties=tiles.map((t,i)=>t.type!=='buddy'?i:null).filter(v=>v!==null);
+  obstacleIdxs=shuffle(empties).slice(0,OB_COUNT).sort((a,b)=>a-b);
+  tiles=tiles.map(t=> t.type==='ob'?{type:'empty'}:t );
+  for(const idx of obstacleIdxs){ tiles[idx]={type:'ob',effect:randomObstacleKind()}; }
+}
+
+function buildBoard(){
+  tiles=[]; slotToBuddy=[];
+  const allIdx=[...Array(TOTAL).keys()];
+  const obIdxs=shuffle([...allIdx]).slice(0,OB_COUNT);
+  obstacleIdxs=[...obIdxs].sort((a,b)=>a-b);
+  for(let i=0;i<TOTAL;i++) tiles[i]={type:'empty'};
+  for(const idx of obstacleIdxs) tiles[idx]={type:'ob',effect:randomObstacleKind()};
+  const spots=allIdx.filter(i=>!obstacleIdxs.includes(i));
+  for(let i=0;i<BUDDY_SLOTS;i++){
+    const spot=spots[i]; if(spot===undefined) break; const nm=roster[i]||'';
+    tiles[spot]={type:'buddy',name:nm}; slotToBuddy[spot]=nm;
+  }
+  pos=0; renderBoard(); toggleActive(); updateWinner('—');
+}
+
+function animateDice(d1,d2){dice1.style.transform='rotateX(720deg)';dice2.style.transform='rotateY(720deg)';setTimeout(()=>{dice1.querySelector('.p').textContent=d1;dice2.querySelector('.p').textContent=d2;},700)}
+
+async function moveSteps(steps){
+  for(let i=0;i<steps;i++){ pos=(pos+1)%TOTAL; toggleActive(); await new Promise(r=>setTimeout(r,350)); }
+  const t=tiles[pos];
+  if(t && t.type==='ob' && t.effect){ await new Promise(r=>setTimeout(r,300)); const ef=t.effect;
+    if(ef.type==='forward'){ for(let k=0;k<ef.value;k++){ pos=(pos+1)%TOTAL; toggleActive(); await new Promise(r=>setTimeout(r,350)); } }
+    else if(ef.type==='back'){ for(let k=0;k<ef.value;k++){ pos=(pos-1+TOTAL)%TOTAL; toggleActive(); await new Promise(r=>setTimeout(r,350)); } }
+    else if(ef.type==='teleport'){ pos=((ef.to-1)%TOTAL+TOTAL)%TOTAL; toggleActive(); }
+  }
+}
+
+function updateWinner(name){winnerEl.textContent=`Buddy ของคุณคือ… ${name} (ผู้เล่น: ${currentPlayer||'—'})`;}
+function renderSummary(){ if(!summaryEl) return; if(pairs.length===0){ summaryEl.innerHTML='<div class="chip"><span>#0</span> ยังไม่มีการจับคู่</div>'; return;} summaryEl.innerHTML = pairs.map((p,i)=>`<div class="chip"><span>#${i+1}</span> <b>👤 ${p.player}</b> → <b>🤝 ${p.buddy}</b></div>`).join(''); }
+
+function rollDice(){
+  if(rolling) return;
+  if(!roster.length){alert('ยังไม่มีรายชื่อ Buddy');return;}
+  if(!currentPlayer){alert('กรุณาสุ่มผู้เล่นตานี้ก่อน');return;}
+  rolling=true; blinkOff();
+  if(autoReshuffle.checked){ chooseObstaclePositionsPreserveBuddy(); renderBoard(); }
+  const d1=Math.floor(Math.random()*6)+1; const d2=Math.floor(Math.random()*6)+1; animateDice(d1,d2);
+  moveSteps(d1+d2).then(()=>{
+    const tile=tiles[pos];
+    if(tile.type==='buddy' && slotToBuddy[pos]){
+      const buddy=slotToBuddy[pos];
+      updateWinner(buddy);
+      pairs.push({player: currentPlayer, buddy});
+      renderSummary();
+      slotToBuddy[pos]=null; // กันซ้ำ
+      currentPlayer=null; // ให้ผู้เล่นคนต่อไปต้องสุ่มใหม่
+      currentEl.textContent='ผู้เล่นตานี้คือ: — 🎮';
+      renderBoard(); // เพื่ออัปเดตขีดทับ
+    } else if(tile.type==='buddy'){
+      updateWinner('— ช่องนี้ถูกจับไปแล้ว — โปรดทอยอีกครั้งด้วยตนเอง');
+      // ผู้เล่นจะกดทอยเองใหม่
+    } else {
+      updateWinner('— ช่องอุปสรรค/ว่าง —');
+    }
+  }).finally(()=>{ rolling=false; if(currentPlayer) blinkOn(); });
+}
+
+function loadNames(){ const raw=namesEl.value.split(/\n/); roster=normalizeList(raw); names=[...roster]; countTag.textContent=`${names.length} รายชื่อ`; buildBoard(); renderRoster(); }
+function resetAll(){ pos=0; tiles=[]; obstacleIdxs=[]; roster=[]; names=[]; slotToBuddy=[]; playersThisRound=[]; currentPlayer=null; pairs=[]; gridEl.innerHTML=''; currentEl.textContent='ผู้เล่นตานี้คือ: — 🎮'; renderSummary(); updateWinner('—'); renderRoster(); buildBoard(); }
+function renderRoster(){ rosterEl.innerHTML=''; for(let i=0;i<14;i++){ const nm=roster[i]||''; const btn=document.createElement('button'); btn.textContent=nm?`• ${nm}`:'—'; if(!nm)btn.disabled=true; rosterEl.appendChild(btn);} }
+
+btnPickPlayer.onclick=()=>{ if(playersThisRound.length===0){playersThisRound=playersEl.value.split(/\n/).map(s=>s.trim()).filter(Boolean)} if(playersThisRound.length===0){alert('ยังไม่มีรายชื่อผู้เล่น');return} const idx=Math.floor(Math.random()*playersThisRound.length); const pick=playersThisRound[idx]; playersThisRound.splice(idx,1); currentPlayer=pick; currentEl.textContent=`ผู้เล่นตานี้คือ: ${pick} 🎮`; playersLeft.textContent=`เหลือ ${playersThisRound.length}`; beep(880,0.25); if(!rolling) blinkOn(); };
+
+btnObsShuffle.onclick=()=>{ chooseObstaclePositionsPreserveBuddy(); renderBoard(); };
+btnObsKinds.onclick=()=>{ obstacleIdxs.forEach(i=>{ if(tiles[i]&&tiles[i].type==='ob'){ tiles[i].effect = randomObstacleKind(); } }); renderBoard(); };
+btnObsClear.onclick=()=>{ obstacleIdxs=[]; tiles=tiles.map(t=> t.type==='ob'?{type:'empty'}:t ); renderBoard(); };
+
+btnLoad.onclick=loadNames;
+btnRoll.onclick=rollDice;
+btnReset.onclick=resetAll;
+addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();rollDice()}});
+
+/* ================= Dev Tests ================= */
+(function runTests(){ if(!testResults) return; const out=[]; const ok=m=>out.push(`<div class='test-pass'>✔ ${m}</div>`); const fail=m=>out.push(`<div class='test-fail'>✘ ${m}</div>`);
+  try{
+    // T1 normalizeList caps/unique
+    const list=normalizeList(['a','b','a','c','d','e','f','g','h','i','j','k','l','m','n']); if(list.length===14 && new Set(list).size===14) ok('normalizeList caps at 14 & unique'); else fail('normalizeList');
+
+    // Prepare board with sample names
+    roster=['A','B','C','D','E','F','G','H','I','J','K','L','M','N']; buildBoard();
+
+    // T2 obstacle positions = 4 unique
+    const uniq=new Set(obstacleIdxs); if(obstacleIdxs.length===4 && uniq.size===4) ok('4 unique obstacle tiles'); else fail('obstacle count/unique');
+
+    // T3 buddy tiles count = 14
+    const buddyCount=tiles.filter(t=>t.type==='buddy').length; if(buddyCount===14) ok('14 buddy tiles rendered'); else fail('buddy tiles count');
+
+    // T4 reshuffle preserves buddies
+    const beforePos=tiles.map((t,i)=>t.type==='buddy'?i:null).filter(v=>v!==null).join(','); chooseObstaclePositionsPreserveBuddy(); const afterPos=tiles.map((t,i)=>t.type==='buddy'?i:null).filter(v=>v!==null).join(','); if(beforePos===afterPos) ok('reshuffle keeps buddy positions'); else fail('buddy moved on reshuffle');
+
+    // T5 summary renders
+    pairs.push({player:'P1',buddy:'B1'}); renderSummary(); const renderedCount = summaryEl ? summaryEl.children.length : 0; if(renderedCount>=1) ok('Summary renders at least one pair'); else fail('Summary rendering');
+  }catch(e){ fail('Test error: '+e.message) }
+  testResults.innerHTML=out.join(''); })();
+
+// placeholders
+namesEl.value=['ณัชชา','กวิน','บีนี่','แนน','อิคคิว','แพร','หมูหวาน','ปลาวาฬ','โซดา','ซันเดย์','ลัคกี้','เพนกวิน','ไลลา','ทอฟฟี่'].join('\n');
+loadNames();
+</script>
+</body>
+</html>
